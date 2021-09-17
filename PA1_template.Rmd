@@ -1,25 +1,156 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Project 1: Reproducible Research"
+author: "Daniel"
+date: "16 September 2021"
+output: github_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=TRUE)
+```
 
-## Loading and preprocessing the data
+# R Markdown for Peer Review
+
+This an R markdown file generated for completion of the Reproducible Research Course Project 1. 
+
+# What is mean total number of steps taken per day?
+
+The following code loads the file to a csv in the working directory. It then converts date column to date datatype and then converts data set to a data frame. 
+
+```{r, echo=TRUE}
+activity <- read.csv("activity.csv")
+
+activity$date <- as.Date(activity$date, "%Y-%m-%d")
+activity <- as.data.frame(activity)
+```
+
+This Plots a histogram for the step total by day using ggplot2
+```{r histogram, fig.height = 4, echo=FALSE}
+library(ggplot2)
+plot1 <- ggplot(data = na.omit(activity), aes(date, steps)) + stat_summary(fun.y = sum, geom = "bar")
+plot1
+```
+
+This calculates mean and median number of steps taken by day.
+```{r, echo=TRUE}
+steps <- with(activity, tapply(steps, date, sum, na.rm = TRUE))
+
+mean(steps)
+median(steps)
+```
+
+#What is the average daily activity pattern?
+
+When we use tapply, the mean for each interval is calculated across days.
+```{r, echo=TRUE}
+daymeans <- with(na.omit(activity), tapply(steps, interval, mean))
+head(daymeans)
+```
+
+```{r plot, fig.height = 4, echo=FALSE}
+plot(daymeans, type = "l", xaxt = "n", xlab = "Minutes per Day", ylab = "Avg Steps")
+axis(1, at=seq_along(daymeans), labels = names(daymeans))
+```
+
+A logical vector is used to select the max value for the mean steps across intervals. It appears the 835th interval gives the maximum value. 
+```{r, echo = TRUE}
+daymeans[which(daymeans == max(daymeans))]
+```
+
+The code below takes the summation of the 'na' values and reports the ratio of na / total observations.
+
+```{r, echo = TRUE}
+library(scales)
+sum(is.na(activity))
+
+percent(sum(is.na(activity))/nrow(activity))
+```
+
+#Inputing missing values
+
+My idea for replacing NAs values is to substitute each NA value by the steps mean per interval.This could be done by nesting a loop to identify the interval of the respective row and then replacing the NA value with the mean for that previously mentioned interval.
+
+To test, we can check the head and the tail of the data both contain NAs.
+```{r, echo = TRUE}
+head(activity)
+tail(activity)
+```
+
+The int and len variable are then set to manage the 'for loop' cases. NAin and NA steps variables are the sections of data that will replace the NA data after the loop.
+
+```{r, echo = TRUE}
+int <- unique(activity$interval)
+len <- nrow(activity[is.na(activity),])
+
+NAint <-  activity[is.na(activity),3]
+NAsteps <- activity[is.na(activity),1]
+
+for (j in 1:2304) {
+       for (i in 1:288){
+              if (NAint[j] == int[i])
+                     NAsteps[j] <- daymeans[i]
+       
+       }
+}
+
+NAindex <- is.na(activity$steps)
+activity$steps<- replace(activity$steps,NAindex, NAsteps)
+```
+
+As shown below, the NA values were replaced by the appropriate mean for the 5 min interval.
 
 
+```{r, echo = TRUE}
+head(activity)
+tail(activity)
+```
 
-## What is mean total number of steps taken per day?
+A histogram is shown below with the updated data.
+```{r hist, fig.height = 4, echo=FALSE}
+plot2 <- ggplot(data = activity, aes(date, steps)) + stat_summary(fun.y = sum, geom = "bar")
+plot2
+```
 
 
+This Calculates the mean and median of steps taken by day
+```{r, echo=TRUE}
+steps <- with(activity, tapply(steps, date, sum, na.rm = TRUE))
 
-## What is the average daily activity pattern?
+mean(steps)
+median(steps)
+```
+Do these values differ from the estimates from the first part of the assignment? What is the impact of inputing missing data on the estimates of the total daily number of steps?
 
+Yes they changed since the NAs were replaced with the interval mean. The mean and the median for the day now appropriately match.
 
+#Are there differences in activity patterns between weekdays and weekends?
 
-## Imputing missing values
+The code below creates a new factor variable.
 
+```{R Weekdays}
+library(dplyr)
+activity <- mutate(activity, day = weekdays(activity$date))
 
+weekdays <- c('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday')
 
-## Are there differences in activity patterns between weekdays and weekends?
+activity$day <- factor((weekdays(activity$date) %in% weekdays), 
+         levels=c(FALSE, TRUE), labels=c('Weekend', 'Weekday'))
+```
+
+```{r, echo=TRUE}
+weekdays <- subset(activity, day == "Weekday")
+weekends <- subset(activity, day == "Weekend")
+
+weekendmeans <- with(weekends, tapply(steps, interval, mean))
+weekdaymeans <- with(weekdays, tapply(steps, interval, mean))
+```
+
+```{r plot3, fig.height = 6, echo=FALSE}
+par(mfrow=c(2,1))
+par(mar=c(5,2,2,2))
+plot(weekdaymeans, type = "l", xaxt = "n", xlab = "Minutes in a Day", ylab = "Average Steps")
+axis(1, at=seq_along(weekdaymeans), labels = names(weekdaymeans))
+
+plot(weekendmeans, type = "l", xaxt = "n", xlab = "Minutes in a Day", ylab = "Average Steps")
+axis(1, at=seq_along(weekendmeans), labels = names(weekendmeans))
+```
